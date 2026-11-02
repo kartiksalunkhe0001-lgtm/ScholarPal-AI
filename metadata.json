@@ -1,0 +1,6 @@
+{
+  "name": "ScholarPal AI",
+  "description": "Find the right scholarship. Prepare to win it. Verified Indian scholarships, AI mock tests, and 24/7 guidance for Class 1 to Doctorate.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
