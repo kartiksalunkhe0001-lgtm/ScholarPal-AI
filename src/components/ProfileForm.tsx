@@ -324,7 +324,14 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
   };
 
   const handleSubmit = () => {
-    if (!validateStep(currentStep)) return;
+    // Validate all steps from 0 to 5 so no required field is missed
+    for (let s = 0; s <= 5; s++) {
+      if (!validateStep(s)) {
+        setCurrentStep(s);
+        window.scrollTo({ top: 100, behavior: 'smooth' });
+        return;
+      }
+    }
 
     const numAge = typeof age === 'number' ? age : Number(age) || 18;
     const finalDistrict = customDistrict.trim() || district;

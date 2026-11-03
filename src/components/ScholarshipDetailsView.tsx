@@ -21,6 +21,9 @@ import {
   Check,
   Info,
   Flag,
+  Heart,
+  Bell,
+  RotateCcw,
 } from 'lucide-react';
 import { ScholarshipDetailsData, StudentProfile } from '../types/index.ts';
 
@@ -30,6 +33,13 @@ interface ScholarshipDetailsViewProps {
   onBack: () => void;
   onTakeTest: () => void;
   onReportIssue?: (category: 'Wrong information' | 'Broken link', scholarshipName: string, url?: string) => void;
+  isSaved?: boolean;
+  onToggleSave?: () => void;
+  onOpenRemindMe?: () => void;
+  onRefreshDetails?: () => void;
+  isRefreshing?: boolean;
+  onChecklistChange?: (docIds: string[]) => void;
+  initialCheckedDocs?: string[];
 }
 
 const DEFAULT_HOW_TO_APPLY_STEPS = [
@@ -107,16 +117,29 @@ export const ScholarshipDetailsView: React.FC<ScholarshipDetailsViewProps> = ({
   onBack,
   onTakeTest,
   onReportIssue,
+  isSaved = false,
+  onToggleSave,
+  onOpenRemindMe,
+  onRefreshDetails,
+  isRefreshing = false,
+  onChecklistChange,
+  initialCheckedDocs = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'syllabus' | 'prep' | 'documents' | 'how-to-apply'>(
     'overview'
   );
 
-  // Checked documents state (stored in local storage)
+  // Checked documents state (stored in local storage and synced to Firestore)
   const [checkedDocs, setCheckedDocs] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem(`scholarpal_docs_${scholarship.id}`);
-      return saved ? JSON.parse(saved) : {};
+      if (saved) return JSON.parse(saved);
+      if (initialCheckedDocs && initialCheckedDocs.length > 0) {
+        const map: Record<string, boolean> = {};
+        initialCheckedDocs.forEach((id) => (map[id] = true));
+        return map;
+      }
+      return {};
     } catch {
       return {};
     }
@@ -138,6 +161,10 @@ export const ScholarshipDetailsView: React.FC<ScholarshipDetailsViewProps> = ({
     try {
       localStorage.setItem(`scholarpal_docs_${scholarship.id}`, JSON.stringify(updated));
     } catch {}
+    if (onChecklistChange) {
+      const ids = Object.keys(updated).filter((k) => updated[k]);
+      onChecklistChange(ids);
+    }
   };
 
   const toggleStep = (stepNumber: number) => {
@@ -252,23 +279,64 @@ export const ScholarshipDetailsView: React.FC<ScholarshipDetailsViewProps> = ({
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-200">
       {/* Back button & Action Bar */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 mb-4">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4 text-emerald-600" />
           <span>Back to All Scholarships</span>
         </button>
 
-        {/* Report Wrong Information Button (Requirement B1) */}
-        <button
-          onClick={() => openReportModal('Wrong information', scholarship.officialUrl)}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-rose-600 px-3 py-1.5 rounded-xl hover:bg-rose-50 transition-colors"
-        >
-          <Flag className="w-3.5 h-3.5" />
-          <span>Report wrong info</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Refresh Details Button */}
+          {onRefreshDetails && (
+            <button
+              onClick={onRefreshDetails}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-emerald-800 bg-white hover:bg-emerald-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+              title="Refresh details with latest official announcements"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 text-emerald-600 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh details'}</span>
+            </button>
+          )}
+
+          {/* Remind Me Button */}
+          {onOpenRemindMe && (
+            <button
+              onClick={onOpenRemindMe}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-emerald-50 hover:text-emerald-800 px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+            >
+              <Bell className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Remind me</span>
+            </button>
+          )}
+
+          {/* Heart Save Button */}
+          {onToggleSave && (
+            <button
+              onClick={onToggleSave}
+              className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors cursor-pointer shadow-2xs ${
+                isSaved
+                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                  : 'bg-white text-slate-600 border-slate-200 hover:text-rose-600 hover:bg-rose-50'
+              }`}
+            >
+              <Heart className={`w-3.5 h-3.5 ${isSaved ? 'fill-rose-600 text-rose-600' : ''}`} />
+              <span>{isSaved ? 'Saved' : 'Save'}</span>
+            </button>
+          )}
+
+          {/* Report Wrong Information Button (Requirement B1) */}
+          <button
+            onClick={() => openReportModal('Wrong information', scholarship.officialUrl)}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-rose-600 px-3 py-1.5 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
+          >
+            <Flag className="w-3.5 h-3.5" />
+            <span>Report wrong info</span>
+          </button>
+        </div>
       </div>
 
       {/* Hero Header Card */}
@@ -749,56 +817,86 @@ export const ScholarshipDetailsView: React.FC<ScholarshipDetailsViewProps> = ({
       {activeTab === 'documents' && (
         <div className="space-y-4">
           <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200">
-            <h3 className="text-base font-black text-slate-900 mb-2">Mandatory Document Checklist</h3>
-            <p className="text-xs text-slate-500 mb-6">
-              Keep these documents scanned in PDF format (under 200 KB) and self-attested before applying.
-            </p>
-            <div className="space-y-3">
-              {(scholarship.documentsNeeded || [
+            {(() => {
+              const docsList = scholarship.documentsNeeded || [
                 { id: 'd1', name: 'Digital Income Certificate (Tehsildar)', required: true, description: 'Current financial year' },
                 { id: 'd2', name: 'Aadhaar Card (Seeded with Bank Account)', required: true, description: 'NPCI verified' },
                 { id: 'd3', name: 'Bonafide Student Certificate with Principal Seal', required: true, description: 'Signed and dated' },
                 { id: 'd4', name: 'Previous Academic Year Marksheet', required: true, description: 'Self-attested copy' }
-              ]).map((doc) => {
-                const isChecked = Boolean(checkedDocs[doc.id]);
-                return (
-                  <div
-                    key={doc.id}
-                    onClick={() => toggleDoc(doc.id)}
-                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                      isChecked ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <button type="button" className="shrink-0" aria-label={`Check ${doc.name}`}>
-                        {isChecked ? (
-                          <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center">
-                            <Check className="w-3.5 h-3.5" />
-                          </div>
-                        ) : (
-                          <div className="w-5 h-5 rounded-md border-2 border-slate-300 bg-white" />
-                        )}
-                      </button>
-                      <div>
-                        <p className={`text-xs sm:text-sm font-bold ${isChecked ? 'text-emerald-950 line-through' : 'text-slate-900'}`}>
-                          {doc.name}
-                        </p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">{doc.description}</p>
-                      </div>
-                    </div>
+              ];
+              const totalDocs = docsList.length;
+              const readyCount = docsList.filter((d) => checkedDocs[d.id]).length;
 
-                    {doc.required && (
-                      <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0">
-                        Mandatory
-                      </span>
-                    )}
+              return (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">Mandatory Document Checklist</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Keep these documents scanned in PDF format (under 200 KB) and self-attested before applying.
+                      </p>
+                    </div>
+                    <span className="text-xs font-black px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      {readyCount} of {totalDocs} ready
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+
+                  {/* Mandatory Safety Notice */}
+                  <div className="my-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Checklist only. Never type or upload these in this app.</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {docsList.map((doc) => {
+                      const isChecked = Boolean(checkedDocs[doc.id]);
+                      return (
+                        <div
+                          key={doc.id}
+                          onClick={() => toggleDoc(doc.id)}
+                          className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isChecked ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <button type="button" className="shrink-0" aria-label={`Check ${doc.name}`}>
+                              {isChecked ? (
+                                <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center">
+                                  <Check className="w-3.5 h-3.5" />
+                                </div>
+                              ) : (
+                                <div className="w-5 h-5 rounded-md border-2 border-slate-300 bg-white" />
+                              )}
+                            </button>
+                            <div>
+                              <p className={`text-xs sm:text-sm font-bold ${isChecked ? 'text-emerald-950 line-through' : 'text-slate-900'}`}>
+                                {doc.name}
+                              </p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">{doc.description}</p>
+                            </div>
+                          </div>
+
+                          {doc.required && (
+                            <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0">
+                              Mandatory
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>Source: {scholarship.verifiedSourceBadge || 'Official Authority'}</span>
+                    <span>Last verified on {scholarship.lastVerifiedOn}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
+
 
       {/* External Redirection Disclaimer Modal (Requirement B2) */}
       {redirectModalUrl && (

@@ -115,24 +115,13 @@ export function evaluateScholarshipEligibility(
   }
 
   // 5. Exam preference alignment
-  if (scholarship.isExamBased) {
-    if (!profile.readyForExam && profile.wantsNoExam) {
-      return {
-        isEligible: false,
-        score: 0,
-        chanceLabel: 'Low',
-        reasons: ['This is an exam-based scholarship, but your preference is without exam.'],
-      };
-    }
-  } else {
-    if (!profile.wantsNoExam && profile.readyForExam) {
-      return {
-        isEligible: false,
-        score: 0,
-        chanceLabel: 'Low',
-        reasons: ['Direct merit/no-exam scholarship, while your preference is exam-based only.'],
-      };
-    }
+  if (scholarship.isExamBased && profile.wantsNoExam && !profile.readyForExam) {
+    return {
+      isEligible: false,
+      score: 0,
+      chanceLabel: 'Low',
+      reasons: ['This is an exam-based scholarship, but your preference is without exam.'],
+    };
   }
 
   // 6. Existing scholarship conflict check

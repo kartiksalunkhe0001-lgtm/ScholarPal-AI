@@ -191,11 +191,12 @@ export class GeminiService {
     );
 
     let lastError: any = null;
+    const defaultTimeout = params.purpose === 'research' || params.purpose === 'verify' ? 120000 : 60000;
 
     // Attempt 1 & 2 on PRIMARY_MODEL (with backoff retry on 429, 500, 503)
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const primarySignal = params.abortSignal || AbortSignal.timeout(12000);
+        const primarySignal = params.abortSignal || AbortSignal.timeout(defaultTimeout);
         const config = {
           ...baseConfig,
           abortSignal: primarySignal,
@@ -221,6 +222,20 @@ export class GeminiService {
       } catch (err: any) {
         lastError = err;
         const errMsg = err?.message || String(err);
+
+        // Fast-fail if tools and responseSchema are rejected as incompatible (Requirement 5)
+        const hasToolsAndSchema = Boolean(params.tools?.length && params.responseSchema);
+        if (
+          hasToolsAndSchema &&
+          (errMsg.includes('tool') ||
+            errMsg.includes('schema') ||
+            errMsg.includes('400') ||
+            errMsg.includes('INVALID_ARGUMENT') ||
+            errMsg.includes('not supported'))
+        ) {
+          throw new Error('Hybrid Search + JSON schema unsupported in single request: ' + redactApiKey(errMsg));
+        }
+
         const isRetryable =
           errMsg.includes('429') ||
           errMsg.includes('500') ||
@@ -253,7 +268,7 @@ export class GeminiService {
     );
 
     try {
-      const fallbackSignal = params.abortSignal || AbortSignal.timeout(30000);
+      const fallbackSignal = params.abortSignal || AbortSignal.timeout(defaultTimeout);
       const fallbackConfig = {
         ...baseConfig,
         abortSignal: fallbackSignal,
@@ -378,6 +393,7 @@ export class GeminiService {
     systemInstruction?: string;
     schema: any;
     validateFn?: (parsed: any) => boolean;
+    abortSignal?: AbortSignal;
   }): Promise<{
     data: T;
     sources: { title: string; url: string }[];
@@ -396,6 +412,7 @@ export class GeminiService {
         responseMimeType: 'application/json',
         responseSchema: params.schema,
         maxOutputTokens: 8192,
+        abortSignal: params.abortSignal,
       });
 
       const cleaned = stripCodeFences(singleRes.text);
@@ -433,6 +450,7 @@ export class GeminiService {
         systemInstruction: params.systemInstruction,
         tools: [{ googleSearch: {} }],
         maxOutputTokens: 8192,
+        abortSignal: params.abortSignal,
       });
       researchText = researchRes.text;
       sources = researchRes.sources || [];
@@ -446,6 +464,7 @@ export class GeminiService {
         contents: `Provide complete verified official information and guidelines for:\n${params.prompt}\nInclude official government portals, eligibility, dates, and amounts.`,
         systemInstruction: params.systemInstruction,
         maxOutputTokens: 8192,
+        abortSignal: params.abortSignal,
       });
       researchText = synthRes.text;
       activeModel = synthRes.modelUsed;
@@ -470,6 +489,7 @@ export class GeminiService {
           responseMimeType: 'application/json',
           responseSchema: params.schema,
           maxOutputTokens: 8192,
+          abortSignal: params.abortSignal,
         });
 
         const cleaned = stripCodeFences(formatRes.text);
@@ -521,13 +541,6 @@ export class GeminiService {
 // Helper: Parallel Grounded Search for Matching (Requirement A2 & 5)
 // -------------------------------------------------------------
 async function searchParallelVerifiedScholarships(profile: StudentProfile): Promise<Scholarship[]> {
-  const queries = [
-    `Indian central government scholarships 2026 2027 ${profile.educationLevel} NSP Ministry of Education MoSJE`,
-    `Official state government scholarships for ${profile.state} students 2026 2027`,
-    `Verified CSR corporate trust scholarships 2026 India ${profile.educationLevel} Tata Reliance HDFC`,
-    `Exam based competitive scholarships India 2026 2027 ${profile.educationLevel}`,
-  ];
-
   const scholarshipArraySchema = {
     type: Type.ARRAY,
     items: {
@@ -553,56 +566,53 @@ async function searchParallelVerifiedScholarships(profile: StudentProfile): Prom
     },
   };
 
-  const results: Scholarship[] = [];
+  const prompt = `Comprehensive Indian scholarship research for 2026-2027 academic sessions.
+Candidate profile:
+- Level of study: ${profile.educationLevel}
+- State of domicile: ${profile.state}
+- Gender: ${profile.gender}
+- Social Category: ${profile.casteCategory}
+- Total annual family income: ₹${profile.totalAnnualIncome}
+- Special categories: ${profile.hasDisability ? 'Person with Disability (PwD), ' : ''}${profile.isOrphan ? 'Orphan, ' : ''}${profile.religionMinority && profile.religionMinority !== 'None' ? `${profile.religionMinority} Minority, ` : ''}none.
 
-  const promises = queries.map(async (qStr) => {
-    try {
-      const prompt = `Official Indian scholarship verification. Query: "${qStr}".
-Candidate: ${profile.educationLevel}, ${profile.gender}, ${profile.casteCategory}, State: ${profile.state}, Family Income: ₹${profile.totalAnnualIncome}.
-Return authentic 2026-2027 scholarships formatted strictly as a JSON array.`;
+Find and verify 4 to 8 authentic, currently applicable Central government (NSP/UGC/AICTE), State government (${profile.state} state scholarship portal), and verified CSR/trust scholarships (Tata, Reliance, HDFC, Kotak, ONGC).
+Return as a strict JSON array.`;
 
-      const result = await GeminiService.generateGroundedJson<any[]>({
-        prompt,
-        schema: scholarshipArraySchema,
-        validateFn: (data) => Array.isArray(data),
-      });
+  try {
+    const result = await GeminiService.generateGroundedJson<any[]>({
+      prompt,
+      schema: scholarshipArraySchema,
+      validateFn: (data) => Array.isArray(data),
+      abortSignal: AbortSignal.timeout(25000),
+    });
 
-      if (Array.isArray(result.data)) {
-        return result.data.map((item: any, idx: number) => ({
-          id: item.id || `live_sch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${idx}`,
-          name: item.name,
-          provider: item.provider || 'Official Authority',
-          verified: true,
-          benefitAmount: item.benefitAmount || 'Financial Support',
-          benefitDetails: item.benefitDetails || '',
-          isExamBased: Boolean(item.isExamBased),
-          examName: item.examName,
-          lastDateToApply: item.lastDateToApply || 'Not announced yet - check the official website',
-          daysLeft: calculateDaysLeft(item.lastDateToApply) ?? undefined,
-          chanceLabel: (item.chanceLabel === 'Low' || item.chanceLabel === 'Medium' ? item.chanceLabel : 'High') as 'High' | 'Medium' | 'Low',
-          matchScore: typeof item.matchScore === 'number' ? item.matchScore : 88,
-          whyQualify: Array.isArray(item.whyQualify) ? item.whyQualify : ['Matches your student profile criteria.'],
-          type: (item.type === 'State' ? 'State' : item.type === 'Private' ? 'Private' : 'Central') as 'Central' | 'State' | 'Private',
-          officialUrl: item.officialUrl || 'https://scholarships.gov.in',
-          verifiedSourceBadge: item.verifiedSourceBadge || 'Verified Official Source',
-          lastVerifiedOn: new Date().toISOString().split('T')[0],
-          eligibleLevels: [profile.educationLevel],
-        })) as Scholarship[];
-      }
-    } catch (e) {
-      // Individual branch fallback handled cleanly
+    if (Array.isArray(result.data)) {
+      return result.data.map((item: any, idx: number) => ({
+        id: item.id || `live_sch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${idx}`,
+        name: item.name,
+        provider: item.provider || 'Official Authority',
+        verified: true,
+        benefitAmount: item.benefitAmount || 'Financial Support',
+        benefitDetails: item.benefitDetails || '',
+        isExamBased: Boolean(item.isExamBased),
+        examName: item.examName,
+        lastDateToApply: item.lastDateToApply || 'Not announced yet - check the official website',
+        daysLeft: calculateDaysLeft(item.lastDateToApply) ?? undefined,
+        chanceLabel: (item.chanceLabel === 'Low' || item.chanceLabel === 'Medium' ? item.chanceLabel : 'High') as 'High' | 'Medium' | 'Low',
+        matchScore: typeof item.matchScore === 'number' ? item.matchScore : 88,
+        whyQualify: Array.isArray(item.whyQualify) ? item.whyQualify : ['Matches your student profile criteria.'],
+        type: (item.type === 'State' ? 'State' : item.type === 'Private' ? 'Private' : 'Central') as 'Central' | 'State' | 'Private',
+        officialUrl: item.officialUrl || 'https://scholarships.gov.in',
+        verifiedSourceBadge: item.verifiedSourceBadge || 'Verified Official Source',
+        lastVerifiedOn: new Date().toISOString().split('T')[0],
+        eligibleLevels: [profile.educationLevel],
+      })) as Scholarship[];
     }
-    return [];
-  });
+  } catch (err: any) {
+    console.warn('[searchParallelVerifiedScholarships] Grounded search notice:', redactApiKey(err?.message || ''));
+  }
 
-  const settled = await Promise.allSettled(promises);
-  settled.forEach((res) => {
-    if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-      results.push(...res.value);
-    }
-  });
-
-  return results;
+  return [];
 }
 
 // -------------------------------------------------------------
@@ -782,10 +792,8 @@ app.all('/api/ai/diagnostics', async (req: Request, res: Response) => {
 app.post('/api/scholarships/match', async (req: Request, res: Response) => {
   // Requirement 6: 3-minute timeout for long jobs
   req.setTimeout(180000);
-  res.setTimeout(180000);
-
   try {
-    const profile = req.body as StudentProfile;
+    const profile = (req.body?.profile || req.body) as StudentProfile;
     const skipCache = req.body?.skipCache === true || req.headers['x-skip-cache'] === 'true';
 
     if (!profile || !profile.educationLevel) {
@@ -966,6 +974,7 @@ app.post('/api/mock-test/generate', async (req: Request, res: Response) => {
       (s) => s.id === scholarshipId || s.name.toLowerCase() === (scholarshipName || '').toLowerCase()
     );
 
+    let patternBanner: string | undefined = undefined;
     if (targetScholarship) {
       if (targetScholarship.isExamBased === false) {
         return res.json({
@@ -975,11 +984,7 @@ app.post('/api/mock-test/generate', async (req: Request, res: Response) => {
         });
       }
       if (targetScholarship.paperPattern && targetScholarship.paperPattern.isPatternVerified === false) {
-        return res.json({
-          isRefused: true,
-          message:
-            'Official exam pattern has not yet been gazetted by the authorities for the current cycle. Please refer to past year question papers and official syllabus guidelines below to prepare.',
-        });
+        patternBanner = 'Official pattern not announced - using a typical pattern';
       }
     }
 
@@ -992,6 +997,7 @@ app.post('/api/mock-test/generate', async (req: Request, res: Response) => {
       totalMarks: 40,
       durationMinutes: 30,
       negativeMarkRatio: 0.25,
+      banner: patternBanner,
       sections: [
         {
           name: 'Mental Ability & Logical Reasoning',
@@ -1214,6 +1220,7 @@ Return JSON matching schema.`;
         parsed.id = parsed.id || `mock_${Date.now()}`;
         parsed.scholarshipId = scholarshipId || 'sch-gen';
         parsed.scholarshipName = scholarshipName;
+        if (patternBanner) parsed.banner = patternBanner;
         return res.json({ mockTest: parsed, cached: false });
       }
     } catch (genErr) {

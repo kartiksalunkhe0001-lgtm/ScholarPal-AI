@@ -233,6 +233,7 @@ export interface MockTest {
   }[];
   isPatternVerified?: boolean;
   verificationSource?: string;
+  banner?: string;
 }
 
 export interface QuestionReviewItem {
@@ -283,29 +284,63 @@ export interface TestAttempt {
   aiImprovementPlan: string[];
 }
 
-export interface SupportTicket {
+export interface StudentComplaint {
   id: string;
-  category: 'Wrong information' | 'Broken link' | 'App problem' | 'Official portal trouble' | 'Other';
+  category: string;
   message: string;
   userId: string;
   userName: string;
-  userPhoneOrEmail: string;
+  userContact?: string;
+  userPhoneOrEmail?: string;
   createdAt: string;
-  status: 'Open' | 'In Review' | 'Resolved';
+  status: 'Open' | 'In Review' | 'In Progress' | 'Resolved';
   officialHelpdeskUrl?: string;
   scholarshipName?: string;
   brokenUrl?: string;
 }
 
+export type SupportTicket = StudentComplaint;
+
+export interface SavedScholarshipItem {
+  id: string;
+  userId: string;
+  scholarship: Scholarship;
+  savedAt: string;
+  applied: boolean;
+  appliedAt?: string | null;
+  reminders: {
+    open: boolean;
+    sevenDays: boolean;
+    oneDay: boolean;
+    threeDaysExam: boolean;
+  };
+  lastChecked?: string;
+}
+
+export interface StudentNotification {
+  id: string;
+  userId: string;
+  scholarshipId?: string;
+  scholarshipName?: string;
+  title: string;
+  message: string;
+  type: 'opened' | 'closing_soon' | 'dates_changed' | 'exam_soon' | 'general' | 'deadline_7d' | 'deadline_1d';
+  read: boolean;
+  createdAt: string;
+}
+
 export interface UserAccount {
   id: string;
   name: string;
-  authMethod: 'google' | 'phone';
-  emailOrPhone: string;
+  email: string;
+  photoURL?: string;
+  createdAt?: string;
+  authMethod?: 'google';
   savedProfile?: StudentProfile;
+  checklistTicks?: Record<string, string[]>;
   savedScholarshipIds?: string[];
   testAttempts?: TestAttempt[];
-  tickets?: SupportTicket[];
+  tickets?: StudentComplaint[];
 }
 
 export interface MultiGroupFilters {
@@ -316,4 +351,5 @@ export interface MultiGroupFilters {
   sortBy: 'chance' | 'deadline' | 'amount';
   searchQuery?: string;
 }
+
 

@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account document containing profile, checklist ticks, and preferences.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "photoURL": { "type": "string", "description": "Avatar photo URL" },
+        "profile": { "type": "object", "description": "Student profile data" },
+        "checklistTicks": { "type": "object", "description": "Map of scholarship ID to ticked document names" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "SavedScholarship": {
+      "title": "SavedScholarship",
+      "description": "Scholarships saved by student with reminders and status tracking.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Scholarship ID" },
+        "userId": { "type": "string", "description": "Owner student UID" },
+        "scholarship": { "type": "object", "description": "Scholarship snapshot object" },
+        "savedAt": { "type": "string", "format": "date-time" },
+        "applied": { "type": "boolean", "description": "Whether student has marked this as applied" },
+        "appliedAt": { "type": "string", "format": "date-time" },
+        "reminders": { "type": "object", "description": "Reminder configuration flags" },
+        "lastChecked": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "scholarship", "savedAt"]
+    },
+    "StudentNotification": {
+      "title": "StudentNotification",
+      "description": "In-app notifications about deadlines, date announcements, and exam reminders.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique notification ID" },
+        "userId": { "type": "string", "description": "Recipient student UID" },
+        "scholarshipId": { "type": "string", "description": "Related scholarship ID" },
+        "scholarshipName": { "type": "string", "description": "Related scholarship name" },
+        "title": { "type": "string", "description": "Notification title" },
+        "message": { "type": "string", "description": "Notification body" },
+        "type": { "type": "string", "description": "Notification category" },
+        "read": { "type": "boolean", "description": "Whether student has read this notification" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "message", "read", "createdAt"]
+    },
+    "TestAttempt": {
+      "title": "TestAttempt",
+      "description": "Student mock test attempt results and question answers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique test attempt ID" },
+        "userId": { "type": "string", "description": "Student UID" },
+        "testId": { "type": "string", "description": "Mock test ID" },
+        "scholarshipName": { "type": "string", "description": "Scholarship name" },
+        "score": { "type": "number", "description": "Score obtained" },
+        "totalMarks": { "type": "number", "description": "Total possible marks" },
+        "accuracy": { "type": "number", "description": "Percentage accuracy" },
+        "timeTakenSeconds": { "type": "number", "description": "Duration spent in seconds" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "answers": { "type": "object", "description": "Selected answers map" }
+      },
+      "required": ["id", "userId", "testId", "score", "totalMarks", "completedAt"]
+    },
+    "StudentComplaint": {
+      "title": "StudentComplaint",
+      "description": "Support grievance ticket registered by student.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Ticket ID (e.g. TKT-2026-XXXXX)" },
+        "userId": { "type": "string", "description": "Owner student UID" },
+        "userName": { "type": "string", "description": "Student name" },
+        "userContact": { "type": "string", "description": "Contact info" },
+        "category": { "type": "string", "description": "Issue category" },
+        "scholarshipName": { "type": "string", "description": "Related scholarship" },
+        "message": { "type": "string", "description": "Complaint description" },
+        "status": { "type": "string", "description": "Open, In Progress, Resolved" },
+        "officialHelpdeskUrl": { "type": "string", "description": "Official portal helpdesk URL" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "category", "message", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Root user document storing personal profile, preferences, and checklist ticks."
+    },
+    "/users/{userId}/savedScholarships/{scholarshipId}": {
+      "schema": "SavedScholarship",
+      "description": "Subcollection of scholarships saved by user with reminder preferences."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "StudentNotification",
+      "description": "Subcollection of notifications sent to the user regarding deadlines and tests."
+    },
+    "/users/{userId}/testAttempts/{attemptId}": {
+      "schema": "TestAttempt",
+      "description": "Subcollection of AI practice test attempts completed by user."
+    },
+    "/users/{userId}/complaints/{complaintId}": {
+      "schema": "StudentComplaint",
+      "description": "Subcollection of grievance tickets registered by the student."
+    }
+  }
+}

@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Test connection doc used on initial boot
+    match /test/connection {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // User document and all nested private subcollections
+    match /users/{userId} {
+      allow get, update, create, delete: if isValidId(userId) && isOwner(userId);
+      allow list: if isSignedIn() && request.auth.uid == userId;
+
+      match /savedScholarships/{scholarshipId} {
+        allow get, list, create, update, delete: if isValidId(userId) && isValidId(scholarshipId) && isOwner(userId);
+      }
+
+      match /notifications/{notificationId} {
+        allow get, list, create, update, delete: if isValidId(userId) && isValidId(notificationId) && isOwner(userId);
+      }
+
+      match /testAttempts/{attemptId} {
+        allow get, list, create, update, delete: if isValidId(userId) && isValidId(attemptId) && isOwner(userId);
+      }
+
+      match /complaints/{complaintId} {
+        allow get, list, create, update, delete: if isValidId(userId) && isValidId(complaintId) && isOwner(userId);
+      }
+    }
+  }
+}

@@ -247,6 +247,14 @@ export const MockTestView: React.FC<MockTestViewProps> = ({
         </div>
       </div>
 
+      {/* Banner for unannounced or typical pattern */}
+      {mockTest.banner && (
+        <div className="mb-5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2.5 shadow-2xs">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <div className="font-bold">{mockTest.banner}</div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Question Panel (3 cols) */}
         <div className="lg:col-span-3 space-y-4">

@@ -18,6 +18,9 @@ import {
   RotateCcw,
   Globe,
   Compass,
+  Heart,
+  Bell,
+  AlertTriangle,
 } from 'lucide-react';
 import { Scholarship, ChanceLevel, EducationLevel } from '../types/index.ts';
 import { calculateFacetCounts, filterAndRankScholarships } from '../utils/rules.ts';
@@ -31,6 +34,10 @@ interface ScholarshipResultsProps {
   onSelectScholarship: (scholarship: Scholarship) => void;
   onEditProfile: () => void;
   onOfficialSearch?: (query: string) => void;
+  savedScholarshipIds?: string[];
+  onToggleSave?: (scholarship: Scholarship) => void;
+  onOpenRemindMe?: (scholarship: Scholarship) => void;
+  isLiveCheckUnavailable?: boolean;
 }
 
 export const ScholarshipResults: React.FC<ScholarshipResultsProps> = ({
@@ -41,6 +48,10 @@ export const ScholarshipResults: React.FC<ScholarshipResultsProps> = ({
   onSelectScholarship,
   onEditProfile,
   onOfficialSearch,
+  savedScholarshipIds = [],
+  onToggleSave,
+  onOpenRemindMe,
+  isLiveCheckUnavailable = false,
 }) => {
   // Tab: 'matched' vs 'catalog' (Requirement C1)
   const [activeTab, setActiveTab] = useState<'matched' | 'catalog'>('matched');
@@ -488,12 +499,21 @@ export const ScholarshipResults: React.FC<ScholarshipResultsProps> = ({
         </div>
       )}
 
+      {/* Fallback Banner (Requirement 4) */}
+      {!loading && isLiveCheckUnavailable && (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm font-semibold flex items-center gap-3 shadow-xs">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+          <span>Live check unavailable - confirm dates on the official site</span>
+        </div>
+      )}
+
       {/* Scholarship Cards Grid */}
       {!loading && displayedScholarships.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {displayedScholarships.map((item) => {
             const isHigh = item.chanceLabel === 'High';
             const isMedium = item.chanceLabel === 'Medium';
+            const isSaved = savedScholarshipIds.includes(item.id);
 
             return (
               <div
@@ -509,17 +529,51 @@ export const ScholarshipResults: React.FC<ScholarshipResultsProps> = ({
                       <span>{item.verifiedSourceBadge || 'Official Portal'}</span>
                     </span>
 
-                    <div
-                      className={`inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded-full ${
-                        isHigh
-                          ? 'bg-emerald-600 text-white'
-                          : isMedium
-                          ? 'bg-amber-500 text-white'
-                          : 'bg-slate-600 text-white'
-                      }`}
-                    >
-                      <span>{item.chanceLabel} Match</span>
-                      <span className="opacity-90 font-medium">({item.matchScore}%)</span>
+                    <div className="flex items-center gap-1">
+                      {onOpenRemindMe && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenRemindMe(item);
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                          title="Set reminders & add to calendar"
+                          aria-label="Set reminders"
+                        >
+                          <Bell className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onToggleSave && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleSave(item);
+                          }}
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            isSaved
+                              ? 'text-rose-600 bg-rose-50'
+                              : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                          }`}
+                          title={isSaved ? 'Remove from saved' : 'Save scholarship'}
+                          aria-label="Save scholarship"
+                        >
+                          <Heart className={`w-4 h-4 ${isSaved ? 'fill-rose-600 text-rose-600' : ''}`} />
+                        </button>
+                      )}
+                      <div
+                        className={`inline-flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded-full ${
+                          isHigh
+                            ? 'bg-emerald-600 text-white'
+                            : isMedium
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-slate-600 text-white'
+                        }`}
+                      >
+                        <span>{item.chanceLabel} Match</span>
+                        <span className="opacity-90 font-medium">({item.matchScore}%)</span>
+                      </div>
                     </div>
                   </div>
 

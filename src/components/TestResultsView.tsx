@@ -25,6 +25,7 @@ interface TestResultsViewProps {
   attempt: TestAttempt;
   mockTest: MockTest;
   onRetake: () => void;
+  onNewVersion?: () => void;
   onBackToScholarship: () => void;
 }
 
@@ -32,6 +33,7 @@ export const TestResultsView: React.FC<TestResultsViewProps> = ({
   attempt: initialAttempt,
   mockTest,
   onRetake,
+  onNewVersion,
   onBackToScholarship,
 }) => {
   const [attempt, setAttempt] = useState<TestAttempt>(initialAttempt);
@@ -508,21 +510,35 @@ export const TestResultsView: React.FC<TestResultsViewProps> = ({
       )}
 
       {/* Bottom Navigation CTAs */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <button
           onClick={onBackToScholarship}
-          className="w-full sm:w-auto px-6 py-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm shadow-xs min-h-[44px]"
+          className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm shadow-xs min-h-[44px]"
         >
           Return to Scholarship Details
         </button>
 
-        <button
-          onClick={onRetake}
-          className="w-full sm:w-auto px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 min-h-[44px]"
-        >
-          <RotateCcw className="w-4 h-4" />
-          <span>Retake Practice Test (New Questions)</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          <button
+            onClick={onRetake}
+            className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl border-2 border-emerald-600 bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-xs sm:text-sm shadow-xs flex items-center justify-center gap-1.5 min-h-[44px]"
+            title="Retake this exact test without calling AI"
+          >
+            <RotateCcw className="w-4 h-4 text-emerald-600" />
+            <span>Retake This Test</span>
+          </button>
+
+          {onNewVersion && (
+            <button
+              onClick={onNewVersion}
+              className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-1.5 min-h-[44px]"
+              title="Generate fresh AI questions"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>New Version (New AI Questions)</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
